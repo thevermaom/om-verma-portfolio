@@ -54,7 +54,7 @@ jobs:
                 "docker pull \($image)",
                 "if docker container inspect portfolio >/dev/null 2>&1; then docker rm -f portfolio; fi",
                 "docker run -d --name portfolio --restart unless-stopped -p 80:80 \($image)",
-                "curl --fail --silent --show-error http://127.0.0.1/ >/dev/null"
+                "for attempt in $(seq 1 15); do if curl --fail --silent http://127.0.0.1/ >/dev/null; then exit 0; fi; sleep 2; done; docker logs --tail 50 portfolio >&2; exit 1"
               ]
             }')
           command_id=$(aws ssm send-command \
