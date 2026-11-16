@@ -31,3 +31,15 @@ variable "my_ip" {
 variable "public_key_path" {
   default = "~/.ssh/tf-ec2-key.pub"
 }
+
+# One bucket will be created for EACH name in this list
+variable "bucket_names" {
+  type = list(string)
+  default = [
+    "krishna1om2yash3som4-iron-man",
+    "krishna1om2yash3som4-krish",
+    "krishna1om2yash3som4-spider-man",
+  ]
+}
+
+
