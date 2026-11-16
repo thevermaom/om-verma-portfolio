@@ -1,0 +1,12 @@
+# Terraform: never commit these
+# - downloaded plugins (huge, re-created by `terraform init`)
+.terraform/
+# - state files can contain sensitive details (state lives in S3)
+*.tfstate
+*.tfstate.*
+# - variable files may hold secrets / personal values
+*.tfvars
+crash.log
+
+# Local backup of the old state file
+tfstate-old-backup/
