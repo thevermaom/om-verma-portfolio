@@ -1,11 +1,9 @@
-output "public_ip" {
-  value = aws_instance.ubuntu.public_ip
+# Website address of each server
+output "website_urls" {
+  value = { for name, s in aws_instance.web : name => "http://${s.public_ip}" }
 }
 
-output "website_url" {
-  value = "http://${aws_instance.ubuntu.public_ip}"
-}
-
-output "ssh_command" {
-  value = "ssh -i ~/.ssh/tf-ec2-key ubuntu@${aws_instance.ubuntu.public_ip}"
+# SSH command for each server
+output "ssh_commands" {
+  value = { for name, s in aws_instance.web : name => "ssh -i ~/.ssh/tf-ec2-key ubuntu@${s.public_ip}" }
 }

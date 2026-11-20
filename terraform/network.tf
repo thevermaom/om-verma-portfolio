@@ -61,3 +61,18 @@ resource "aws_route_table_association" "private" {
   subnet_id      = aws_subnet.private.id
   route_table_id = aws_route_table.private.id
 }
+
+# SECOND public subnet, in zone ap-south-1b (a load balancer needs 2 zones)
+resource "aws_subnet" "public_b" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.3.0/24"                                  # new range, no overlap
+  availability_zone       = data.aws_availability_zones.available.names[1] # second data centre
+  map_public_ip_on_launch = true
+  tags                    = { Name = "demo-public-subnet-b" }
+}
+
+# Connect it to the PUBLIC route table (0.0.0.0/0 → internet gateway) = makes it public
+resource "aws_route_table_association" "public_b" {
+  subnet_id      = aws_subnet.public_b.id
+  route_table_id = aws_route_table.public.id
+}

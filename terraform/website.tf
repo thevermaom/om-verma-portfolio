@@ -1,4 +1,4 @@
-# 5) Put the portfolio website on the Ubuntu server
+# 5) Put the portfolio website on EVERY Ubuntu server (a and b)
 #
 # How it works:
 #   Terraform connects to the server over SSH (same as you did by hand),
@@ -9,8 +9,9 @@
 # `terraform apply`, and the new version goes live.
 
 resource "terraform_data" "website" {
+  for_each = aws_instance.web # NEW: one website setup per server (a and b)
   triggers_replace = [
-    aws_instance.ubuntu.id, # a new server needs the website again
+    each.value.id, # CHANGED: the id of THIS server
     filemd5("${path.module}/index.html"),
     filemd5("${path.module}/styles.css"),
     filemd5("${path.module}/script.js"),
@@ -20,7 +21,7 @@ resource "terraform_data" "website" {
   # How Terraform logs in to the server (your private key = the key)
   connection {
     type        = "ssh"
-    host        = aws_instance.ubuntu.public_ip
+    host        = each.value.public_ip # CHANGED: the IP of THIS server
     user        = "ubuntu"
     private_key = file(pathexpand("~/.ssh/tf-ec2-key"))
     timeout     = "5m"
@@ -77,4 +78,10 @@ resource "terraform_data" "website" {
       "sudo systemctl restart nginx",
     ]
   }
+}
+
+# The old single website setup is now the one for server "a" (don't redo it)
+moved {
+  from = terraform_data.website
+  to   = terraform_data.website["a"]
 }
