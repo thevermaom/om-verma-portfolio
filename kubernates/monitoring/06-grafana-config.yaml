@@ -11,7 +11,7 @@ stringData:
   GF_SECURITY_ADMIN_USER: "admin"
   GF_SECURITY_ADMIN_PASSWORD: "admin123"
 ---
-# Data source: tell Grafana where Prometheus is
+# Data sources: tell Grafana where Prometheus (numbers) and Loki (logs) are
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -27,6 +27,11 @@ data:
         access: proxy
         url: http://prometheus.monitoring.svc:9090
         isDefault: true
+      - name: Loki                       # logs (09-loki.yaml)
+        uid: loki
+        type: loki
+        access: proxy
+        url: http://loki.monitoring.svc:3100
 ---
 # Dashboard provider: "load every dashboard JSON file from this folder"
 apiVersion: v1

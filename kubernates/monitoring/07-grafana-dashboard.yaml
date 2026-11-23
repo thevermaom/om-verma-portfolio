@@ -84,6 +84,20 @@ data:
             { "refId": "C", "legendFormat": "deleted",  "expr": "increase(pg_stat_user_tables_n_tup_del{relname=\"students\"}[5m])" }
           ],
           "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+        },
+        {
+          "type": "logs", "title": "Website logs (Loki)",
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 23 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "targets": [{ "refId": "A", "expr": "{namespace=\"om\", app=\"web\"}" }],
+          "options": { "showTime": true, "wrapLogMessage": true, "sortOrder": "Descending" }
+        },
+        {
+          "type": "logs", "title": "Database logs (Loki)",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 35 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "targets": [{ "refId": "A", "expr": "{namespace=\"om\", app=\"postgres\"}" }],
+          "options": { "showTime": true, "wrapLogMessage": true, "sortOrder": "Descending" }
         }
       ]
     }

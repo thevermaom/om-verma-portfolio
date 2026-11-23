@@ -97,9 +97,15 @@ then connect to `localhost:5432`, db `portfolio_db`, user `om_user`, password `d
 
 ---
 
-## Monitoring (Prometheus + Grafana)
+## Monitoring (Prometheus + Loki + Grafana)
+
+```
+numbers: pods / postgres-exporter / kube-state-metrics ─→ Prometheus ─┐
+logs:    every pod ─→ Alloy (collector) ─→ Loki ───────────────────────┴→ Grafana (one screen)
+```
 
 Files are in `monitoring/` (namespace `monitoring`, plus `postgres-exporter` in `om`).
+`09-loki.yaml` stores logs, `10-alloy.yaml` collects them from every pod.
 
 ```powershell
 kubectl apply -f monitoring/                                    # deploy (once)
@@ -116,6 +122,19 @@ Prometheus → Status → **Targets**: all should be `UP`.
 | Database up | `pg_up` |
 | Students in table | `pg_stat_user_tables_n_live_tup{relname="students"}` |
 | CPU per pod | `sum by (pod) (rate(container_cpu_usage_seconds_total{namespace="om",container!=""}[2m]))` |
+
+**Logs:** Grafana → **Explore** → pick **Loki** → switch to **Code** → type a LogQL query → Run query.
+
+| Want | LogQL |
+|---|---|
+| All website logs | `{namespace="om", app="web"}` |
+| Only POST requests (add/edit/delete) | `{namespace="om", app="web"} \|= "POST"` |
+| Errors anywhere | `{namespace=~".+"} \|~ "(?i)error"` |
+| Database logs | `{namespace="om", app="postgres"}` |
+| Requests per minute | `sum(count_over_time({namespace="om", app="web"} \|= "GET" [1m]))` |
+
+`{...}` picks the streams (by label), `|= "x"` keeps lines containing x, `|~` uses a regex.
+After changing `06-grafana-config.yaml`: `kubectl rollout restart deployment/grafana -n monitoring`.
 
 Remove: `kubectl delete -f monitoring/`
 

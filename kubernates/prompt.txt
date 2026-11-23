@@ -20,4 +20,7 @@ now , i want to through grafana/prometheus so create a simple deployment for it 
 kubectl port-forward -n monitoring svc/grafana 3000:3000----used this command and add user--admin and password---admin123 and then it was working , showing me dashboard
 
 
+please add loki also and share me the step so that i can step up monitor
+
+i dont know how to check loki , prometheus , etc in dashboard , help me understand step by step how to watch it all individually
 
