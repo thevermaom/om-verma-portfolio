@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Student Records</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <main>
+    <h1>Student Records</h1>
+    <p class="sub">A tiny website that stores data in PostgreSQL, running on Kubernetes.</p>
+
+    {% if message %}<p class="msg">{{ message }}</p>{% endif %}
+
+    <!-- Totals: SELECT COUNT(*), AVG(marks) -->
+    <div class="stats">
+      <div><b>{{ total }}</b><span>students</span></div>
+      <div><b>{{ average if average is not none else "–" }}</b><span>average marks</span></div>
+    </div>
+
+    <!-- CREATE: this form sends POST /add → INSERT -->
+    <h2>Add a student</h2>
+    <form class="add" method="post" action="/add">
+      <input name="name" placeholder="Name" maxlength="80" required />
+      <input name="email" type="email" placeholder="Email" maxlength="120" required />
+      <input name="course" placeholder="Course" maxlength="80" required />
+      <input name="marks" type="number" min="0" max="100" placeholder="Marks" />
+      <button>Add</button>
+    </form>
+
+    <!-- READ: GET /?q=... → SELECT ... WHERE ... ILIKE -->
+    <h2>All students</h2>
+    <form class="search" method="get" action="/">
+      <input name="q" value="{{ search }}" placeholder="Search by name or course" />
+      <button>Search</button>
+      {% if search %}<a href="/">Clear</a>{% endif %}
+    </form>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Name</th><th>Email</th><th>Course</th><th>Marks</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for id, name, email, course, marks in students %}
+          <tr>
+            <td>{{ id }}</td>
+            <td>{{ name }}</td>
+            <td>{{ email }}</td>
+            <td>{{ course }}</td>
+            <td>{{ marks if marks is not none else "–" }}</td>
+            <td class="actions">
+              <!-- UPDATE: go to the edit page -->
+              <a href="/edit/{{ id }}">Edit</a>
+              <!-- DELETE: POST /delete/<id> → DELETE -->
+              <form method="post" action="/delete/{{ id }}" onsubmit='return confirm("Delete " + {{ name|tojson }} + "?")'>
+                <button class="danger">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="empty">No students found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="pod">Served by pod: <code>{{ pod }}</code></p>
+  </main>
+</body>
+</html>

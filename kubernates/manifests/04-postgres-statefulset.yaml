@@ -1,0 +1,50 @@
+# The PostgreSQL database.
+# StatefulSet (not Deployment) = fixed name "postgres-0" + its own disk that survives restarts.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: om
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:                    # the postgres image reads these on FIRST start only
+            - name: POSTGRES_DB
+              valueFrom: { configMapKeyRef: { name: db-config, key: DB_NAME } }
+            - name: POSTGRES_USER
+              valueFrom: { configMapKeyRef: { name: db-config, key: DB_USER } }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: db-secret, key: DB_PASSWORD } }
+            - name: PGDATA        # data folder inside the disk
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:         # "can postgres accept connections?"
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits:   { memory: 256Mi }
+  volumeClaimTemplates:           # creates the disk "data-postgres-0" (1Gi)
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi

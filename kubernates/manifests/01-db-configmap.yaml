@@ -1,0 +1,13 @@
+# Normal (non-secret) database settings.
+# Used by the database (04) and the website (05).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-config
+  namespace: om
+data:
+  DB_HOST: "postgres.om.svc.cluster.local"   # = Service "postgres" (03)
+  DB_PORT: "5432"
+  DB_NAME: "portfolio_db"
+  DB_USER: "om_user"
+  DB_SSLMODE: "disable"

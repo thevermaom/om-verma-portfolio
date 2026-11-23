@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Edit Student</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <main>
+    <h1>Edit student #{{ s[0] }}</h1>
+    {% if error %}<p class="msg error">{{ error }}</p>{% endif %}
+
+    <!-- UPDATE: this form sends POST /edit/<id> → UPDATE ... WHERE id = <id> -->
+    <form class="edit" method="post" action="/edit/{{ s[0] }}">
+      <label>Name   <input name="name"   value="{{ s[1] }}" maxlength="80" required /></label>
+      <label>Email  <input name="email"  value="{{ s[2] }}" type="email" maxlength="120" required /></label>
+      <label>Course <input name="course" value="{{ s[3] }}" maxlength="80" required /></label>
+      <label>Marks  <input name="marks"  value="{{ s[4] if s[4] is not none else '' }}" type="number" min="0" max="100" /></label>
+      <div class="row">
+        <button>Save changes</button>
+        <a href="/">Cancel</a>
+      </div>
+    </form>
+  </main>
+</body>
+</html>

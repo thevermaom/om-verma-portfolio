@@ -1,0 +1,82 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #f4f6f8;
+  color: #1d2330;
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+main {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 32px 16px 48px;
+}
+
+h1 { margin: 0; font-size: 30px; }
+h2 { margin: 32px 0 12px; font-size: 18px; }
+.sub { margin: 6px 0 0; color: #5b6475; }
+
+.msg {
+  margin: 20px 0 0;
+  padding: 10px 14px;
+  border-left: 4px solid #2f7d4f;
+  background: #e6f4ea;
+}
+.msg.error { border-color: #b3261e; background: #fbe9e7; }
+
+.stats { display: flex; gap: 16px; margin-top: 20px; }
+.stats div {
+  flex: 1;
+  padding: 16px;
+  border: 1px solid #dde2ea;
+  border-radius: 8px;
+  background: #fff;
+}
+.stats b { display: block; font-size: 28px; }
+.stats span { color: #5b6475; font-size: 13px; }
+
+input, button { font: inherit; font-size: 14px; }
+input {
+  padding: 9px 10px;
+  border: 1px solid #c8cfdb;
+  border-radius: 6px;
+  background: #fff;
+}
+button {
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+}
+button:hover { background: #1d4ed8; }
+button.danger { padding: 5px 10px; background: #b3261e; }
+
+.add { display: grid; grid-template-columns: 1fr 1fr 1fr 90px auto; gap: 8px; }
+.search { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.search input { flex: 1; }
+
+.table-wrap { overflow-x: auto; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #dde2ea;
+  background: #fff;
+}
+th, td { padding: 10px 12px; border-bottom: 1px solid #eef1f5; text-align: left; font-size: 14px; }
+th { background: #f8f9fb; color: #5b6475; font-size: 12px; text-transform: uppercase; }
+.actions { display: flex; gap: 12px; align-items: center; }
+.actions form { margin: 0; }
+.empty { color: #5b6475; text-align: center; }
+
+.edit { display: flex; flex-direction: column; gap: 12px; max-width: 420px; margin-top: 20px; }
+.edit label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #5b6475; }
+.row { display: flex; gap: 16px; align-items: center; }
+
+.pod { margin-top: 28px; color: #5b6475; font-size: 13px; }
+
+@media (max-width: 700px) {
+  .add { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,45 @@
+# Grafana settings, loaded automatically when Grafana starts ("provisioning")
+
+# Login (dummy, local learning only)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-login
+  namespace: monitoring
+type: Opaque
+stringData:
+  GF_SECURITY_ADMIN_USER: "admin"
+  GF_SECURITY_ADMIN_PASSWORD: "admin123"
+---
+# Data source: tell Grafana where Prometheus is
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: monitoring
+data:
+  prometheus.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        uid: prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus.monitoring.svc:9090
+        isDefault: true
+---
+# Dashboard provider: "load every dashboard JSON file from this folder"
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider
+  namespace: monitoring
+data:
+  provider.yaml: |
+    apiVersion: 1
+    providers:
+      - name: default
+        folder: Kubernetes
+        type: file
+        options:
+          path: /etc/grafana/dashboards

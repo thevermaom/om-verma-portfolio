@@ -1,0 +1,43 @@
+# prometheus.yml: WHAT to collect and HOW OFTEN
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s          # collect every 15 seconds
+
+    scrape_configs:
+      # 1) Prometheus watches itself
+      - job_name: prometheus
+        static_configs:
+          - targets: ["localhost:9090"]
+
+      # 2) Kubernetes objects: deployments, pods, restarts... (04-kube-state-metrics.yaml)
+      - job_name: kube-state-metrics
+        static_configs:
+          - targets: ["kube-state-metrics.monitoring.svc:8080"]
+
+      # 3) The database (05-postgres-exporter.yaml)
+      - job_name: postgres
+        static_configs:
+          - targets: ["postgres-exporter.om.svc:9187"]
+
+      # 4) CPU / memory of every container, from the kubelet on each node
+      - job_name: cadvisor
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        authorization:
+          credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        kubernetes_sd_configs:
+          - role: node                # find all nodes automatically
+        relabel_configs:              # ask the API server to fetch each node's metrics for us
+          - target_label: __address__
+            replacement: kubernetes.default.svc:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor

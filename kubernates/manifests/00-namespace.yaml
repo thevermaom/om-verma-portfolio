@@ -1,0 +1,5 @@
+# The "room" everything else lives in
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: om

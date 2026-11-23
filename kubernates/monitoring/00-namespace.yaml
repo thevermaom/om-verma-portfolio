@@ -1,0 +1,5 @@
+# A separate "room" for the monitoring tools
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring

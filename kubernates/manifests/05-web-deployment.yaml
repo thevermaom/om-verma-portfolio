@@ -1,0 +1,37 @@
+# The website: Student Records (code in ../student-app/)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: om
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      initContainers:             # runs FIRST: wait until the database answers
+        - name: wait-for-db
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z postgres 5432; do echo waiting for db; sleep 2; done"]
+      containers:
+        - name: web
+          image: student-app:1.0            # built locally, loaded into kind
+          imagePullPolicy: IfNotPresent     # don't download it, it's already on the nodes
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: db-config             # DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_SSLMODE (01)
+            - secretRef:
+                name: db-secret             # DB_PASSWORD (02)
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8000 }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits:   { memory: 192Mi }

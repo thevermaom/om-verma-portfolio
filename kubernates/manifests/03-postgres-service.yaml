@@ -1,0 +1,13 @@
+# Gives the database the stable name "postgres" inside the cluster.
+# Internal only: not reachable from the browser.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: om
+spec:
+  selector:
+    app: postgres                 # send traffic to pods labelled app=postgres (04)
+  ports:
+    - port: 5432
+      targetPort: 5432
