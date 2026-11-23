@@ -1,0 +1,23 @@
+give me a dummy database env using config map in app.yaml
+now , create a updated website before deployment which uses database
+how to know if i will be using database in my website and how can i check ?
+now i need to practice the database work also so update the website which involves database use
+how to check if my database is working ?
+give me the link where you have attached my database
+
+i have deleted kubernates/website because it was not working 
+delete A:\Resume\kubernates\website because it was not what i wanted
+
+ A:\Resume\kubernates
+now i need to practice the database work also so update the website which involves database use
+
+my student-app is created and database is working properly 
+separate all the yaml files in kubernates for clarity
+show me the deployment site where i can see
+i saved some new value in database , now tell me how to check it in db ?
+
+now , i want to through grafana/prometheus so create a simple deployment for it and share me the steps so that i can step up monitor
+kubectl port-forward -n monitoring svc/grafana 3000:3000----used this command and add user--admin and password---admin123 and then it was working , showing me dashboard
+
+
+
