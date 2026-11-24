@@ -140,6 +140,149 @@ Remove: `kubectl delete -f monitoring/`
 
 ---
 
+## Grafana Cloud (same monitoring, online)
+
+Local = only on my laptop (`localhost:3000`). Grafana Cloud = a **copy** online at
+**https://orangeelephant1089.grafana.net**, opens from any browser, no port-forward.
+
+```
+LAPTOP (kind cluster)                                           INTERNET
+Prometheus ──remote_write──→ alloy-cloud ──(URL + user + token)──→ Grafana Cloud Prometheus
+pod logs ──────────────────→ alloy-cloud ──(URL + user + token)──→ Grafana Cloud Loki
+local Prometheus / Loki / Grafana → unchanged
+```
+
+| File | What it does |
+|---|---|
+| `monitoring/11-grafana-cloud.yaml` | **alloy-cloud**: receives metrics from Prometheus + reads pod logs → sends both to Grafana Cloud |
+| `monitoring/02-prometheus-config.yaml` | `remote_write` → pushes a copy to alloy-cloud (only dashboard metrics, `om`/`monitoring`) |
+| `grafana-cloud/student-app-dashboard.json` | my dashboard, ready to import into Grafana Cloud |
+| Secret `grafana-cloud` | URLs, users, token. **Created by hand, never in Git** (repo is public) |
+
+Free plan: ~10k metric series, logs + metrics kept ~14 days. Data is sent **only while Docker Desktop is running**.
+
+### Step 1 – Copy 4 values (browser)
+
+1. Open **https://grafana.com/orgs/orangeelephant1089** (Grafana Cloud Portal).
+2. Next to `orangeelephant1089` click **Details** (not *Launch*).
+3. **Prometheus** box → **Details** → copy into Notepad:
+   - `prom-url` = **Remote Write Endpoint** (ends with `/api/prom/push`)
+   - `prom-user` = **Username / Instance ID** (a number)
+4. **Loki** box → **Details** → copy:
+   - `loki-url` = **URL** **+ type `/loki/api/v1/push` at the end**
+   - `loki-user` = **User** (a number)
+
+### Step 2 – Create the token (browser)
+
+1. Same portal, left menu → **SECURITY → Access Policies** → **Create access policy**.
+2. Name `laptop` → Scopes: tick **metrics: Write** and **logs: Write** → **Create**.
+3. On the new policy → **Add token** → **Create** → copy `glc_...` (**shown only once**).
+
+### Step 3 – Give the values to the cluster (PowerShell)
+
+Replace every `<...>` **including the `< >`**. No spaces after `=`. Keep the `` ` `` at line ends.
+
+```powershell
+cd A:\Resume\kubernates
+kubectl create secret generic grafana-cloud -n monitoring `
+  --from-literal=prom-url=<Remote Write Endpoint> `
+  --from-literal=prom-user=<Prometheus username> `
+  --from-literal=loki-url=<Loki URL>/loki/api/v1/push `
+  --from-literal=loki-user=<Loki user> `
+  --from-literal=token=<glc_... token>
+# → secret/grafana-cloud created
+```
+
+### Step 4 – Start sending
+
+```powershell
+kubectl apply -f monitoring/                                        # creates alloy-cloud
+kubectl rollout restart deployment/prometheus deployment/alloy-cloud -n monitoring
+kubectl get pods -n monitoring                                      # alloy-cloud 1/1 Running
+```
+
+### Step 5 – Check it is sending (PowerShell)
+
+```powershell
+# a) no errors in the last 5 minutes = good (no output)
+kubectl logs -n monitoring deploy/alloy-cloud --since=5m | Select-String "level=error|level=warn"
+
+# b) counters go UP each time you run the 2nd line
+kubectl port-forward -n monitoring deploy/alloy-cloud 12345:12345   # terminal 1 (leave open)
+curl.exe -s localhost:12345/metrics | Select-String "^loki_write_sent_entries_total|^prometheus_remote_storage_samples_total|status_code=`"204`""
+```
+Also: open **http://localhost:12345** (Alloy UI) → every component **green = healthy**.
+
+### Step 6 – See it in Grafana Cloud (browser)
+
+Open **https://orangeelephant1089.grafana.net** → **Explore** → time **Last 15 minutes** → **Code** → Run query:
+
+| Data source | Query | Expect |
+|---|---|---|
+| `grafanacloud-...-prom` | `pg_up` | **1** (DB up) |
+| `grafanacloud-...-prom` | `up{cluster="kind-learn"}` | lines at 1 |
+| `grafanacloud-...-logs` | `{namespace="om", app="web"}` | website log lines |
+| `grafanacloud-...-logs` | `{cluster="kind-learn"} \|= "POST"` | add / edit / delete clicks |
+
+### Step 7 – Import the dashboard (browser)
+
+1. **Dashboards → New → Import**.
+2. Click **Upload dashboard JSON file** → `A:\Resume\kubernates\grafana-cloud\student-app-dashboard.json`
+   (or paste the file's text in the big box → **Load**). Ignore red "required" messages before uploading.
+3. Prometheus → pick **...-prom**, Loki → pick **...-logs** → **Import**.
+4. **Dashboards → Student App on Kubernetes** – works from any browser.
+
+### Change / remove
+
+```powershell
+# see one stored value (change loki-url to prom-url / prom-user / loki-user; don't print token)
+[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((kubectl get secret grafana-cloud -n monitoring -o jsonpath="{.data.loki-url}")))
+
+# wrong value or new token → re-create the Secret, then restart the sender
+kubectl delete secret grafana-cloud -n monitoring
+kubectl create secret generic grafana-cloud -n monitoring ...      # Step 3 again
+kubectl rollout restart deployment/alloy-cloud -n monitoring
+
+# stop sending to the cloud (local monitoring keeps working)
+kubectl delete -f monitoring/11-grafana-cloud.yaml
+```
+
+### Grafana Cloud not working? Check in this order
+
+```
+① Docker Desktop → ② pods running → ③ alloy-cloud sending → ④ Grafana Cloud showing
+```
+The first step that fails is the problem.
+
+| Step | Command / where | ✅ OK | ❌ Problem → fix |
+|---|---|---|---|
+| ① Cluster on | `kubectl get nodes` | 3 nodes `Ready` | `Unable to connect` → open Docker Desktop, wait ~1 min |
+| ② Pods | `kubectl get pods -n monitoring` | all `1/1 Running` (esp. `alloy-cloud`, `prometheus`) | `CrashLoopBackOff` / `CreateContainerConfigError` → `kubectl describe pod ...` |
+| ③ Sender | `kubectl logs -n monitoring deploy/alloy-cloud --since=5m \| Select-String "level=error\|level=warn"` | no output | see table below |
+| ④ Cloud | Explore, time = **Last 15 minutes** | `-prom`: `up{cluster="kind-learn"}` = 1 · `-logs`: `{cluster="kind-learn"}` shows recent lines | nothing → go back to ③ |
+
+| Word in the log | Meaning | Fix |
+|---|---|---|
+| `401` / `unauthorized` | token wrong or expired | new token → re-create Secret → restart `alloy-cloud` |
+| `404` | wrong URL in Secret | copy URLs again from grafana.com → stack → Details |
+| `429` / `rate limit` | too much data for free plan | send fewer metrics (`write_relabel_configs` in `02`) |
+| `TLS handshake timeout` / `no such host` | laptop slept / internet blip | fixes itself; check again in 2 min (that minute of data is missing) |
+
+**Looks broken but isn't:**
+- Time range too short (e.g. *Last 5 minutes* after laptop sleep) → use **Last 1 hour**.
+- Wrong data source → use the ones ending **-prom** and **-logs** (not `-usage`).
+- Laptop off / Docker closed → nothing is sent → gap in graphs. Normal.
+
+### Reading the dashboard correctly
+
+| Panel | Why it can look wrong |
+|---|---|
+| **Pod restarts = 5 (red)** | Not students. Docker was closed once → 3 web + postgres + exporter each restarted once. Red at ≥ 1. |
+| **Students in table** | Uses Postgres's *estimate* (`n_live_tup`), not `COUNT(*)`. After Docker is closed suddenly the estimate resets. Fix: `kubectl exec -n om postgres-0 -- psql -U om_user -d portfolio_db -c "ANALYZE students;"` |
+| **DB connections = 2** | Both are postgres-exporter: one connection always open + one opened during each scrape. The website connects per click and closes in ms, so it rarely shows. 3+ = busy website or someone in `psql`/DBeaver. |
+
+---
+
 ## Everyday commands
 
 | Task | Command |
@@ -190,3 +333,17 @@ Remove: `kubectl delete -f monitoring/`
 | `CrashLoopBackOff` | `kubectl logs -n om <pod> --previous` |
 | No pods shown | Add `-n om` |
 | Wrong cluster | `kubectl config use-context kind-learn` |
+
+
+# Artifacts for understanding Kubernates/monitoring 
+
+https://claude.ai/artifact/MxE6JuQ8QN8BdUMo9aBozL
+
+
+# Workloads , probes and volumes 
+
+https://claude.ai/artifact/HXSsaupzfoYRxkbH3dmoZC#probes
+
+
+
+

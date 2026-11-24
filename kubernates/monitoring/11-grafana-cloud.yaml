@@ -1,0 +1,146 @@
+# Grafana Cloud: send a COPY of metrics + logs to orangeelephant1089.grafana.net
+# The local Prometheus / Loki / Grafana keep working exactly as before.
+#
+#   Prometheus ──remote_write──→ alloy-cloud ──→ Grafana Cloud Prometheus (metrics)
+#   every pod's logs ──────────→ alloy-cloud ──→ Grafana Cloud Loki       (logs)
+#
+# URLs, usernames and the token come from the Secret "grafana-cloud".
+# It is created by hand with kubectl (see README) and is NEVER saved in Git.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloy-cloud-config
+  namespace: monitoring
+data:
+  config.alloy: |
+    // ---------- METRICS ----------
+    // 1. Prometheus pushes its numbers here (see remote_write in 02-prometheus-config.yaml)
+    prometheus.receive_http "from_prometheus" {
+      http {
+        listen_address = "0.0.0.0"
+        listen_port    = 9999
+      }
+      forward_to = [prometheus.remote_write.cloud.receiver]
+    }
+
+    // 2. ...and Alloy forwards them to Grafana Cloud
+    prometheus.remote_write "cloud" {
+      endpoint {
+        url = sys.env("PROM_URL")
+        basic_auth {
+          username = sys.env("PROM_USER")
+          password = sys.env("GC_TOKEN")
+        }
+      }
+    }
+
+    // ---------- LOGS ----------
+    // 3. Find every pod and give it short labels (same as 10-alloy.yaml)
+    discovery.kubernetes "pods" {
+      role = "pod"
+    }
+
+    discovery.relabel "pods" {
+      targets = discovery.kubernetes.pods.targets
+      rule {
+        source_labels = ["__meta_kubernetes_namespace"]
+        target_label  = "namespace"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_name"]
+        target_label  = "pod"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_container_name"]
+        target_label  = "container"
+      }
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_app"]
+        target_label  = "app"
+      }
+    }
+
+    // 4. Read the logs and send them to Grafana Cloud Loki
+    loki.source.kubernetes "pods" {
+      targets    = discovery.relabel.pods.output
+      forward_to = [loki.write.cloud.receiver]
+    }
+
+    loki.write "cloud" {
+      external_labels = { cluster = "kind-learn" }
+      endpoint {
+        url = sys.env("LOKI_URL")
+        basic_auth {
+          username = sys.env("LOKI_USER")
+          password = sys.env("GC_TOKEN")
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alloy-cloud
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alloy-cloud
+  template:
+    metadata:
+      labels:
+        app: alloy-cloud
+    spec:
+      serviceAccountName: alloy          # reuses the "read pods and logs" permission from 10-alloy.yaml
+      containers:
+        - name: alloy
+          image: grafana/alloy:v1.5.1
+          args:
+            - run
+            - /etc/alloy/config.alloy
+            - --server.http.listen-addr=0.0.0.0:12345
+            - --storage.path=/var/lib/alloy/data
+          env:                            # values from the Secret, read by sys.env(...) above
+            - name: PROM_URL
+              valueFrom: { secretKeyRef: { name: grafana-cloud, key: prom-url } }
+            - name: PROM_USER
+              valueFrom: { secretKeyRef: { name: grafana-cloud, key: prom-user } }
+            - name: LOKI_URL
+              valueFrom: { secretKeyRef: { name: grafana-cloud, key: loki-url } }
+            - name: LOKI_USER
+              valueFrom: { secretKeyRef: { name: grafana-cloud, key: loki-user } }
+            - name: GC_TOKEN
+              valueFrom: { secretKeyRef: { name: grafana-cloud, key: token } }
+          ports:
+            - containerPort: 12345        # Alloy UI
+            - containerPort: 9999         # metrics come in here from Prometheus
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alloy
+            - name: data
+              mountPath: /var/lib/alloy/data
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits:   { memory: 256Mi }
+      volumes:
+        - name: config
+          configMap: { name: alloy-cloud-config }
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alloy-cloud
+  namespace: monitoring
+spec:
+  selector:
+    app: alloy-cloud
+  ports:
+    - name: ui
+      port: 12345
+      targetPort: 12345
+    - name: metrics-in
+      port: 9999
+      targetPort: 9999

@@ -21,6 +21,7 @@ kubectl port-forward -n monitoring svc/grafana 3000:3000----used this command an
 
 
 please add loki also and share me the step so that i can step up monitor
-
 i dont know how to check loki , prometheus , etc in dashboard , help me understand step by step how to watch it all individually
-
+Create a diagram and create give a artifact and give a link to open in browser which shows the connection of everything prometheus , loki , alloy and everything and take the context from the files in Kubernetes monitoring so that I can understand what the use of each file is. Just use these exact files and showcase them in the diagram, like this is used here and that is used here, in that way.
+https://kubernetes-monitoring-file-map.krishnasen0006.chatgpt.site/
+i want this kind of artifacts
