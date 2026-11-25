@@ -1,0 +1,6 @@
+# A separate "room" for practice, so the student app (namespace om) is never touched.
+# Delete everything later with:  kubectl delete namespace practice
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: practice

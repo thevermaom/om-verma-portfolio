@@ -1,0 +1,39 @@
+# VOLUME 3: PersistentVolumeClaim (PVC) = a REAL disk that outlives the pod.
+#   PVC  = "I need 50Mi of disk"  (the request)
+#   StorageClass "standard"       makes the disk automatically
+#   PV   = the actual disk        (created for you, name pvc-xxxx)
+# Pod deleted → disk stays → new pod mounts the same disk → data still there.
+# Used for: databases, uploads, anything that must not be lost.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: notes-disk
+  namespace: practice
+spec:
+  accessModes: ["ReadWriteOnce"]   # one node at a time can use it
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 50Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: volume-pvc
+  namespace: practice
+spec:
+  volumes:
+    - name: notes
+      persistentVolumeClaim:
+        claimName: notes-disk       # use the PVC above
+  containers:
+    - name: app
+      image: busybox:1.36
+      # Each start ADDS a line. Delete the pod, apply again → one more line, old lines kept.
+      command: ["sh", "-c", "echo \"$(date) - pod started\" >> /data/notes.txt; cat /data/notes.txt; sleep 86400"]
+      volumeMounts:
+        - name: notes
+          mountPath: /data
+      resources:
+        requests: { cpu: 5m, memory: 8Mi }
+        limits:   { memory: 32Mi }

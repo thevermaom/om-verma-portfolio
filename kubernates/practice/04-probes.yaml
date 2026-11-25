@@ -1,0 +1,63 @@
+# PROBES = health checks Kubernetes runs on your container, again and again.
+#
+#   startupProbe   "Have you finished starting?"      fails too long → RESTART
+#                  (liveness + readiness wait until this passes once)
+#   livenessProbe  "Are you still alive / not frozen?" fails → RESTART the container
+#   readinessProbe "Can you take visitors right now?"  fails → NO TRAFFIC (no restart)
+#
+# This demo app is controlled by 3 files you can delete by hand:
+#   /tmp/started  /tmp/alive  /tmp/ready
+# It "starts slowly" (20 s), then creates the 3 files and serves a web page on 8080.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: probe-demo
+  namespace: practice
+  labels:
+    app: probe-demo
+spec:
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["sh", "-c", "echo 'starting slowly (20s)...'; sleep 20; touch /tmp/started /tmp/alive /tmp/ready; echo 'hello from probe-demo' > /tmp/index.html; echo 'started, serving on 8080'; httpd -f -p 8080 -h /tmp"]
+      ports:
+        - containerPort: 8080
+
+      # 1) STARTUP: check every 5 s, allow up to 12 failures = 60 s to start
+      startupProbe:
+        exec:
+          command: ["cat", "/tmp/started"]
+        periodSeconds: 5
+        failureThreshold: 12
+
+      # 2) LIVENESS: every 5 s; 2 failures in a row (≈10 s) → container is restarted
+      livenessProbe:
+        exec:
+          command: ["cat", "/tmp/alive"]
+        periodSeconds: 5
+        failureThreshold: 2
+
+      # 3) READINESS: every 5 s; 1 failure → removed from the Service (READY 0/1)
+      readinessProbe:
+        exec:
+          command: ["cat", "/tmp/ready"]
+        periodSeconds: 5
+        failureThreshold: 1
+
+      resources:
+        requests: { cpu: 5m, memory: 8Mi }
+        limits:   { memory: 32Mi }
+---
+# Service in front: it only sends traffic to the pod while it is READY.
+# Watch it with:  kubectl get endpoints -n practice probe-demo
+apiVersion: v1
+kind: Service
+metadata:
+  name: probe-demo
+  namespace: practice
+spec:
+  selector:
+    app: probe-demo
+  ports:
+    - port: 8080
+      targetPort: 8080

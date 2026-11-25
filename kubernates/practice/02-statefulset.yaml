@@ -1,0 +1,56 @@
+# STATEFULSET = "copies that each have a FIXED name and their OWN disk"
+# Like numbered bank lockers: locker-0 always has the same contents.
+# Pods are named counter-0, counter-1 (never random), start in order 0 → 1,
+# and each gets its own disk (PVC data-counter-0, data-counter-1) that survives pod deletion.
+# Used for: databases (your "postgres-0" is a StatefulSet).
+
+# "Headless" Service (clusterIP: None) = gives each pod its own DNS name:
+#   counter-0.counter.practice.svc  and  counter-1.counter.practice.svc
+apiVersion: v1
+kind: Service
+metadata:
+  name: counter
+  namespace: practice
+spec:
+  clusterIP: None
+  selector:
+    app: counter
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: counter
+  namespace: practice
+spec:
+  serviceName: counter            # the headless Service above
+  replicas: 2
+  selector:
+    matchLabels:
+      app: counter
+  template:
+    metadata:
+      labels:
+        app: counter
+    spec:
+      containers:
+        - name: app
+          image: busybox:1.36
+          # Every time the pod starts it ADDS one line to its own disk.
+          # Delete the pod → it comes back with the same name → the file has one more line.
+          command: ["sh", "-c", "echo \"$(date) - started as $HOSTNAME\" >> /data/history.txt; cat /data/history.txt; sleep 86400"]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests: { cpu: 5m, memory: 8Mi }
+            limits:   { memory: 32Mi }
+  # One disk PER POD, created automatically: data-counter-0, data-counter-1
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 50Mi

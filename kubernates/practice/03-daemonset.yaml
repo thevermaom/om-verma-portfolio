@@ -1,0 +1,38 @@
+# DAEMONSET = "exactly ONE copy on EVERY node"
+# Like one security guard per building. You don't choose a number:
+# 3 nodes → 3 pods. Add a node → a pod appears there automatically.
+# Used for: log collectors, monitoring agents, network helpers
+# (your cluster already has 2: kube-proxy and kindnet in kube-system).
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-agent
+  namespace: practice
+spec:
+  selector:
+    matchLabels:
+      app: node-agent
+  template:
+    metadata:
+      labels:
+        app: node-agent
+    spec:
+      # The control-plane node has a "keep out" sign (a taint).
+      # This toleration lets our agent run there too → 3 pods instead of 2.
+      # Try deleting these 4 lines and re-applying: you'll get only 2 pods.
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: agent
+          image: busybox:1.36
+          env:
+            - name: NODE_NAME          # Kubernetes fills in which node this pod is on
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          command: ["sh", "-c", "while true; do echo \"$(date +%T) agent checking node $NODE_NAME\"; sleep 30; done"]
+          resources:
+            requests: { cpu: 5m, memory: 8Mi }
+            limits:   { memory: 32Mi }

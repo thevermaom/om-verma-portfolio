@@ -16,6 +16,8 @@ Cluster = 3 Docker containers: learn-control-plane (brain) + learn-worker + lear
 ```
 kubernates/
 ├── kind-config.yaml                  the CLUSTER: 1 control plane + 2 workers, port 30080
+├── practice/                         HANDS-ON labs: Deployment / StatefulSet / DaemonSet,
+│                                     probes, volumes → see practice/README.md
 ├── manifests/                        the APP (applied in number order)
 │   ├── 00-namespace.yaml             namespace "om"
 │   ├── 01-db-configmap.yaml          DB_HOST, DB_PORT, DB_NAME, DB_USER
@@ -267,6 +269,16 @@ The first step that fails is the problem.
 | `404` | wrong URL in Secret | copy URLs again from grafana.com → stack → Details |
 | `429` / `rate limit` | too much data for free plan | send fewer metrics (`write_relabel_configs` in `02`) |
 | `TLS handshake timeout` / `no such host` | laptop slept / internet blip | fixes itself; check again in 2 min (that minute of data is missing) |
+
+**Panels empty after Docker restart, but alloy-cloud has no errors?** Prometheus → Status → Targets shows
+`kube-state-metrics` / `postgres` **DOWN** = the nodes lost the network route to each other.
+
+```powershell
+docker exec learn-worker ip route | Select-String "10.244"     # each OTHER node's 10.244.X.0/24 must be listed
+kubectl rollout restart daemonset/kindnet -n kube-system       # kindnet rebuilds the routes
+kubectl get pods -n om                                         # pods stuck "Unknown" → delete them, they come back
+kubectl delete pod -n om <pod> --grace-period=0 --force
+```
 
 **Looks broken but isn't:**
 - Time range too short (e.g. *Last 5 minutes* after laptop sleep) → use **Last 1 hour**.

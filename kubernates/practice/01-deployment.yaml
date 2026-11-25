@@ -1,0 +1,39 @@
+# DEPLOYMENT = "keep N identical copies running, I don't care which is which"
+# Like taxi drivers: any free one can take you. Pods get RANDOM names (hello-7d9f...-x2k4p),
+# no own disk, can run on any node. Used for: websites, APIs (your "web" is a Deployment).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello
+  namespace: practice
+spec:
+  replicas: 3                     # how many copies
+  selector:
+    matchLabels:
+      app: hello                  # "the pods with this label are mine"
+  template:                       # the recipe for each copy
+    metadata:
+      labels:
+        app: hello
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine   # a tiny web server
+          ports:
+            - containerPort: 80
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits:   { memory: 64Mi }
+---
+# One stable name in front of all 3 copies (traffic is shared between them)
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello
+  namespace: practice
+spec:
+  selector:
+    app: hello
+  ports:
+    - port: 80
+      targetPort: 80
