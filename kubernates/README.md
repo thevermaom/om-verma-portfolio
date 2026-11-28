@@ -122,7 +122,7 @@ Prometheus → Status → **Targets**: all should be `UP`.
 |---|---|
 | Web pods ready | `kube_deployment_status_replicas_available{namespace="om",deployment="web"}` |
 | Database up | `pg_up` |
-| Students in table | `pg_stat_user_tables_n_live_tup{relname="students"}` |
+| Students in table | `students_count` (own `SELECT COUNT(*)` in `05-postgres-exporter.yaml`) |
 | CPU per pod | `sum by (pod) (rate(container_cpu_usage_seconds_total{namespace="om",container!=""}[2m]))` |
 
 **Logs:** Grafana → **Explore** → pick **Loki** → switch to **Code** → type a LogQL query → Run query.
@@ -290,7 +290,7 @@ kubectl delete pod -n om <pod> --grace-period=0 --force
 | Panel | Why it can look wrong |
 |---|---|
 | **Pod restarts = 5 (red)** | Not students. Docker was closed once → 3 web + postgres + exporter each restarted once. Red at ≥ 1. |
-| **Students in table** | Uses Postgres's *estimate* (`n_live_tup`), not `COUNT(*)`. After Docker is closed suddenly the estimate resets. Fix: `kubectl exec -n om postgres-0 -- psql -U om_user -d portfolio_db -c "ANALYZE students;"` |
+| **Students in table** | Now `students_count` = a real `SELECT COUNT(*)` (custom query in `05-postgres-exporter.yaml`). Before, it used Postgres's *estimate* `n_live_tup`, which resets when Docker is closed suddenly (showed 1 instead of 6). |
 | **DB connections = 2** | Both are postgres-exporter: one connection always open + one opened during each scrape. The website connects per click and closes in ms, so it rarely shows. 3+ = busy website or someone in `psql`/DBeaver. |
 
 ---
@@ -358,4 +358,7 @@ https://claude.ai/artifact/HXSsaupzfoYRxkbH3dmoZC#probes
 
 
 
+# what is how a storage class is made for ebs and efs and how then it is used as a persistent volume claim in a deployment, stateful set, etc.?
+
+https://claude.ai/artifact/MkPsrVbuNRXV9tBA1kSUky
 

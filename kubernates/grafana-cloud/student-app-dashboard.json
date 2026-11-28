@@ -29,7 +29,7 @@
           "type": "stat", "title": "Students in table",
           "gridPos": { "h": 5, "w": 5, "x": 10, "y": 0 },
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "targets": [{ "refId": "A", "expr": "pg_stat_user_tables_n_live_tup{relname=\"students\"}" }],
+          "targets": [{ "refId": "A", "expr": "students_count" }],
           "options": { "colorMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } },
           "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [ { "color": "blue", "value": null } ] } }, "overrides": [] }
         },

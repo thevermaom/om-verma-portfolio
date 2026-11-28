@@ -1,6 +1,24 @@
 # postgres-exporter: logs into PostgreSQL and turns its statistics into numbers
 # e.g. pg_up = 1, pg_stat_user_tables_n_live_tup{relname="students"} = rows in the table
 # Lives in namespace "om" so it can reuse db-config and db-secret.
+
+# Our OWN query: an exact row count. n_live_tup above is only Postgres's ESTIMATE and
+# resets to 0 when Docker is closed suddenly → the dashboard showed 1 instead of 6.
+# Each top-level key = metric prefix, each column = metric:  students_count = SELECT COUNT(*)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-exporter-queries
+  namespace: om
+data:
+  queries.yaml: |
+    students:
+      query: "SELECT COUNT(*) AS count FROM students"
+      metrics:
+        - count:
+            usage: "GAUGE"
+            description: "Exact number of rows in the students table"
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,6 +37,11 @@ spec:
       containers:
         - name: postgres-exporter
           image: quay.io/prometheuscommunity/postgres-exporter:v0.16.0
+          args:
+            - --extend.query-path=/etc/exporter/queries.yaml   # run our own queries too
+          volumeMounts:
+            - name: queries
+              mountPath: /etc/exporter
           env:
             - name: DATA_SOURCE_URI
               value: "postgres.om.svc.cluster.local:5432/portfolio_db?sslmode=disable"
@@ -31,6 +54,9 @@ spec:
           resources:
             requests: { cpu: 20m, memory: 32Mi }
             limits:   { memory: 128Mi }
+      volumes:
+        - name: queries
+          configMap: { name: postgres-exporter-queries }
 ---
 apiVersion: v1
 kind: Service

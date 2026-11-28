@@ -17,7 +17,7 @@ data:
       - url: http://alloy-cloud.monitoring.svc:9999/api/v1/metrics/write
         write_relabel_configs:
           - source_labels: [__name__]
-            regex: "up|pg_.*|kube_deployment_.*|kube_statefulset_.*|kube_pod_.*|container_cpu_usage_seconds_total|container_memory_working_set_bytes"
+            regex: "up|pg_.*|students_.*|kube_deployment_.*|kube_statefulset_.*|kube_pod_.*|container_cpu_usage_seconds_total|container_memory_working_set_bytes"
             action: keep
           - source_labels: [namespace]
             regex: "(om|monitoring)?"   # only our namespaces (empty = metric has no namespace)

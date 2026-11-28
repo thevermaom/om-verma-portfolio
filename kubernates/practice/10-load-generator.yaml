@@ -1,0 +1,26 @@
+# LOAD GENERATOR = fake visitors. It calls cpu-app non-stop so its CPU goes up.
+#   Start the "rush hour":  kubectl apply  -f practice/10-load-generator.yaml
+#   Stop it:                kubectl delete -f practice/10-load-generator.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load-generator
+  namespace: practice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: load-generator
+  template:
+    metadata:
+      labels:
+        app: load-generator
+    spec:
+      containers:
+        - name: visitor
+          image: busybox:1.36
+          # endless loop: request the page again and again
+          command: ["sh", "-c", "while true; do wget -q -O- http://cpu-app.practice.svc >/dev/null; done"]
+          resources:
+            requests: { cpu: 10m, memory: 8Mi }
+            limits:   { memory: 32Mi }

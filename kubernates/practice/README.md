@@ -13,6 +13,9 @@ Run every command in **PowerShell** from `A:\Resume\kubernates`. Docker Desktop 
 | `05-volume-emptydir.yaml` | **emptyDir** volume | a shared desk drawer, emptied when you leave |
 | `06-volume-configmap-secret.yaml` | **ConfigMap / Secret** as files | a notice pinned to the wall |
 | `07-volume-pvc.yaml` | **PersistentVolumeClaim** | a rented locker that keeps your stuff |
+| `08-metrics-server.yaml` | **metrics-server** (in kube-system) | a thermometer for every pod |
+| `09-hpa.yaml` | **HorizontalPodAutoscaler** + a CPU-hungry app | a shop opening more checkout counters |
+| `10-load-generator.yaml` | fake visitors (load) | the rush hour |
 
 ```powershell
 cd A:\Resume\kubernates
@@ -231,13 +234,106 @@ The chain: **Pod** → `claimName: notes-disk` → **PVC** (request 50Mi) → **
 
 ---
 
+## Part 4 – Autoscaling (metrics-server + HorizontalPodAutoscaler)
+
+**Problem:** with `replicas: 3` you guess the number. Too few → slow site at rush hour. Too many → wasted CPU/money at night.
+**HPA:** Kubernetes changes `replicas` **by itself**, based on how busy the pods are.
+
+```
+            every 15 s                     every 15 s
+ kubelet ───────────────→ metrics-server ───────────→ HPA ──"replicas: 4"──→ Deployment ──→ pods
+ (each node: CPU/RAM      (the thermometer,           (the manager:          (makes / removes
+  of every pod)            keeps only "now")           compares with goal)     pods)
+```
+
+| Piece | Job | Without it |
+|---|---|---|
+| **metrics-server** | measures CPU / memory of every pod *right now* | `kubectl top` → "Metrics API not available", HPA shows `<unknown>` |
+| **resources.requests.cpu** | the "100%" mark: `200m` request → 100m used = 50% | HPA can't calculate a % → never scales |
+| **HPA** | compares CPU % with the goal, changes `replicas` | you scale by hand (`kubectl scale`) |
+
+**The formula** (every 15 s):
+```
+wanted pods = current pods × (current CPU % ÷ goal %)      → rounded UP, kept between min and max
+example:      1 pod × (250% ÷ 50%) = 5 pods
+```
+
+| Words | Meaning |
+|---|---|
+| Horizontal | **more pods** (this lab). *Vertical* = bigger pods (more CPU each) – a different tool (VPA) |
+| `minReplicas` / `maxReplicas` | the floor and the ceiling. Max protects your laptop / cloud bill |
+| `averageUtilization: 50` | the goal: average CPU across pods = 50% of the request |
+| scale up | fast (within ~15–30 s) |
+| scale down | slow on purpose: waits `stabilizationWindowSeconds` (default **5 min**, 60 s here) so it doesn't flap up/down |
+| Prometheus vs metrics-server | Prometheus = **history** for graphs. metrics-server = **only now**, for `kubectl top` + HPA. Different jobs. |
+
+### Lab 8 – Install the thermometer (once per cluster)
+
+```powershell
+kubectl apply -f practice/08-metrics-server.yaml
+kubectl rollout status deployment/metrics-server -n kube-system
+kubectl top nodes                      # wait ~1 min if it says "not available yet"
+kubectl top pods -n om                 # CPU / memory of your student app pods
+```
+
+### Lab 9 – App + autoscaler
+
+```powershell
+kubectl apply -f practice/00-namespace.yaml
+kubectl apply -f practice/09-hpa.yaml
+kubectl get hpa -n practice            # first ~1 min: cpu: <unknown>/50%  (normal – no reading yet)
+                                       # then:        cpu: 0%/50%   REPLICAS 1
+```
+
+### Lab 10 – Rush hour: watch it scale
+
+Open **2 terminals**:
+```powershell
+# terminal 1 – live view (Ctrl+C to stop)
+kubectl get hpa cpu-app -n practice -w
+
+# terminal 2 – start the fake visitors
+kubectl apply -f practice/10-load-generator.yaml
+kubectl get pods -n practice -l app=cpu-app -w       # new pods appear
+kubectl top pods -n practice                         # CPU per pod
+```
+
+What happened when I tested it:
+```
+time  | CPU now / goal | pods
+  0s  |   0% / 50%     | 1
+ 34s  | 161% / 50%     | 1 → creating more
+ 51s  | 250% / 50%     | 4        ← 1 × 250/50 = 5 wanted
+ 68s  | 145% / 50%     | 5        ← maxReplicas reached
+141s  |  55% / 50%     | 5        ← work shared by 5 pods → back near the goal
+```
+
+Stop the rush hour and watch it shrink:
+```powershell
+kubectl delete -f practice/10-load-generator.yaml
+kubectl get hpa cpu-app -n practice -w        # CPU → 0%, ~60–90 s later 5 → 2 → 1 pods
+kubectl describe hpa cpu-app -n practice      # Events: "New size: 5 ... New size: 1; All metrics below target"
+```
+
+| Try | Change in `09-hpa.yaml` → `kubectl apply -f practice/09-hpa.yaml` | Expect |
+|---|---|---|
+| Higher ceiling | `maxReplicas: 8` | goes up to 8 pods under load |
+| Easier goal | `averageUtilization: 80` | fewer pods needed for the same load |
+| No request | delete `requests: cpu: 200m` | HPA shows `<unknown>` – can't scale |
+
+`FailedGetResourceMetric` warnings in the first minute = metrics-server had no reading yet. Normal.
+
+---
+
 ## Clean up
 
 ```powershell
-kubectl delete namespace practice      # deletes EVERYTHING above, including the PVC disks
+kubectl delete namespace practice      # deletes EVERYTHING in practice, including the PVC disks
 kubectl get pv                         # practice disks disappear too (reclaimPolicy Delete)
+kubectl delete -f practice/08-metrics-server.yaml   # only if you also want to remove metrics-server (kube-system)
 ```
 
-Start again any time: `kubectl apply -f practice/`
+Start again: apply the files **one by one** as in the labs.
+(`kubectl apply -f practice/` would also start the load generator → CPU stays busy until you delete it.)
 
 Visual explainer (diagrams + simulators): https://claude.ai/artifact/HXSsaupzfoYRxkbH3dmoZC

@@ -1,0 +1,74 @@
+# HORIZONTAL POD AUTOSCALER (HPA) = "add more pods when they are busy, remove them when quiet".
+#
+#   metrics-server ──(CPU of each pod, every 15 s)──→ HPA ──(changes replicas)──→ Deployment ──→ pods
+#
+# "Horizontal" = MORE pods (wider). "Vertical" would be BIGGER pods (more CPU each) – a different tool.
+# Like a shop opening more checkout counters when the queue gets long.
+#
+# 1) The app: every web request does some maths → uses CPU (official Kubernetes demo image)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cpu-app
+  namespace: practice
+spec:
+  replicas: 1                     # start with 1 – the HPA will change this number
+  selector:
+    matchLabels:
+      app: cpu-app
+  template:
+    metadata:
+      labels:
+        app: cpu-app
+    spec:
+      containers:
+        - name: app
+          image: registry.k8s.io/hpa-example
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 200m           # REQUIRED for HPA: "100% busy" is measured against THIS number
+                                  # 200m = 0.2 of one CPU core
+            limits:
+              cpu: 500m           # never use more than half a core
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cpu-app
+  namespace: practice
+spec:
+  selector:
+    app: cpu-app
+  ports:
+    - port: 80
+      targetPort: 80
+---
+# 2) The autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cpu-app
+  namespace: practice
+spec:
+  scaleTargetRef:                 # WHAT to scale
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cpu-app
+  minReplicas: 1                  # never fewer than 1
+  maxReplicas: 5                  # never more than 5 (protects your laptop / your bill)
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50  # GOAL: average CPU = 50% of the request (= 100m per pod)
+  # The formula the HPA uses every 15 s:
+  #   wanted pods = current pods × (current CPU % ÷ 50%)    (rounded UP)
+  #   e.g. 1 pod at 250%  → 1 × 250/50 = 5 pods
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 60   # wait 60 s of low CPU before removing pods
+                                       # (default is 300 s = 5 min; shortened for practice)
